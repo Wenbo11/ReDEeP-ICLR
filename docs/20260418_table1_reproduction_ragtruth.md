@@ -165,7 +165,7 @@ top_n=2, top_k=17, alpha=0.6).
 | gpt-3.5-turbo-0613 | 450 | 46 | 10.2% | 0.7115 | 0.2170 | 0.3469 |
 | gpt-4-0613 | 450 | 42 | 9.3% | 0.7748 | 0.2719 | 0.3546 |
 
-### Pooled full-dataset results (all 6 generators, 2,700 responses)
+### Pooled full-dataset results — token-level (all 6 generators, 2,700 responses)
 
 Dataset composition: 2,700 responses, 942 hallucinated (34.9%), 1,758 truthful
 (65.1%).
@@ -181,6 +181,44 @@ Dataset composition: 2,700 responses, 942 hallucinated (34.9%), 1,758 truthful
 | Recall (max-F1) | 0.6805 | 0.5743 |
 | Precision (max-F1) | 0.5455 | 0.5868 |
 | F1 (max-F1) | **0.6056** | **0.5805** |
+
+### LLaMA2-7B detector across all generators (chunk-level)
+
+| Generator | N resp. | N halluc. | Halluc. % | AUC | PCC | F1 (max-F1) |
+|-----------|---------|-----------|-----------|-----|-----|-------------|
+| llama-2-7b-chat (same) | 450 | 226 | 50.2% | 0.7473 | 0.4206 | 0.7166 |
+| llama-2-13b-chat | 450 | 207 | 46.0% | 0.8239 | 0.5910 | 0.7696 |
+| llama-2-70b-chat | 450 | 171 | 38.0% | 0.7886 | 0.5168 | 0.6928 |
+| mistral-7B-instruct | 450 | 251 | 55.8% | 0.8007 | 0.5038 | 0.7823 |
+| gpt-3.5-turbo-0613 | 450 | 46 | 10.2% | 0.8214 | 0.3545 | 0.3762 |
+| gpt-4-0613 | 450 | 42 | 9.3% | 0.7967 | 0.3345 | 0.3842 |
+
+### LLaMA2-13B detector across all generators (chunk-level)
+
+| Generator | N resp. | N halluc. | Halluc. % | AUC | PCC | F1 (max-F1) |
+|-----------|---------|-----------|-----------|-----|-----|-------------|
+| llama-2-13b-chat (same) | 450 | 207 | 46.0% | 0.7978 | 0.4724 | 0.7285 |
+| llama-2-7b-chat | 450 | 226 | 50.2% | 0.7144 | 0.3621 | 0.6868 |
+| llama-2-70b-chat | 450 | 171 | 38.0% | 0.7774 | 0.4811 | 0.6866 |
+| mistral-7B-instruct | 450 | 251 | 55.8% | 0.7924 | 0.4987 | 0.7667 |
+| gpt-3.5-turbo-0613 | 450 | 46 | 10.2% | 0.7597 | 0.2640 | 0.3468 |
+| gpt-4-0613 | 450 | 42 | 9.3% | 0.8062 | 0.2971 | 0.3886 |
+
+### Pooled full-dataset results — chunk-level (all 6 generators, 2,700 responses)
+
+Features ranked on the combined 2,700-response dataset, using same hyperparams
+as self-detect (7B: top_n=3, top_k=4, α=0.6; 13B: top_n=9, top_k=3, α=1.8).
+
+| Metric | 7B detector | 13B detector | Paper 7B | Paper 13B |
+|--------|-------------|--------------|----------|-----------|
+| AUC | 0.7372 | 0.7268 | 0.745 | 0.736 |
+| PCC | 0.3933 | 0.3620 | — | — |
+| Recall (max-F1) | 0.6670 | 0.7147 | 0.642 | 0.707 |
+| Precision (max-F1) | 0.5968 | 0.5353 | 0.621 | 0.542 |
+| F1 (max-F1) | **0.6299** | **0.6122** | **0.631** | **0.614** |
+
+The AUC gap (~0.008–0.009) is comparable to the same-model gap for 13B chunk
+(0.7978 vs 0.8244). F1, Precision, and Recall are within ~0.02 of the paper.
 
 ---
 
@@ -216,11 +254,23 @@ selection method. The exact match would require knowing the authors' procedure.
 
 ### Cross-model detection works
 
-AUC ranges from 0.71 to 0.80 across all 12 detector-generator combinations,
-confirming that ReDeEP is generator-agnostic. Notably, the 7B detector on
-llama-2-70b-chat responses (AUC 0.7926) and gpt-4 responses (AUC 0.8046)
-**outperforms** its own same-model result (AUC 0.7325). Same-model evaluation
+AUC ranges from 0.71 to 0.82 across all detector-generator combinations at
+both token and chunk levels, confirming that ReDeEP is generator-agnostic.
+Notably, the 7B chunk detector on llama-2-13b-chat responses (AUC 0.8239)
+**outperforms** its own same-model result (AUC 0.7473). Same-model evaluation
 is a simplification of the paper, not a methodological requirement.
+
+### Paper's "All" column reproduces well
+
+The paper's Table in the appendix reports chunk-level "All" results (2,700
+responses) for both 7B and 13B. Our combined scoring with the paper's
+hyperparameters yields AUC within 0.008-0.009 and F1 within 0.002:
+- 7B: AUC 0.737 (paper 0.745), F1 0.630 (paper 0.631)
+- 13B: AUC 0.727 (paper 0.736), F1 0.612 (paper 0.614)
+
+The small AUC gap is consistent with the hardware-induced gap we observe in
+same-model 13B chunk experiments (our 0.798 vs paper 0.824). The F1 match is
+excellent, suggesting the paper's thresholding procedure is a max-F1 sweep.
 
 ### Class imbalance explains low F1 on GPT models
 
@@ -285,16 +335,14 @@ ReDeEP/log/test_llama2_13B/
   ReDeEP(chunk).json
 
 ReDeEP/log/
-  cross_detect_llama2-7b_gen_gpt-4-0613.json          (81 MB)
-  cross_detect_llama2-7b_gen_gpt-3.5-turbo-0613.json  (101 MB)
-  cross_detect_llama2-7b_gen_mistral-7B-instruct.json  (80 MB)
-  cross_detect_llama2-7b_gen_llama-2-13b-chat.json     (101 MB)
-  cross_detect_llama2-7b_gen_llama-2-70b-chat.json     (93 MB)
-  cross_detect_llama2-13b_gen_gpt-4-0613.json          (120 MB)
-  cross_detect_llama2-13b_gen_gpt-3.5-turbo-0613.json  (96 MB)
-  cross_detect_llama2-13b_gen_mistral-7B-instruct.json (95 MB)
-  cross_detect_llama2-13b_gen_llama-2-7b-chat.json     (115 MB)
-  cross_detect_llama2-13b_gen_llama-2-70b-chat.json    (111 MB)
+  cross_detect_llama2-7b_gen_*.json    # token-level cross-model (5 files, ~80-101 MB each)
+  cross_detect_llama2-13b_gen_*.json   # token-level cross-model (5 files, ~95-120 MB each)
+  cross_chunk_llama2-7b_gen_*.json     # chunk-level cross-model (5 files, ~2-3 MB each)
+  cross_chunk_llama2-13b_gen_*.json    # chunk-level cross-model (5 files, ~2-3 MB each)
+  cross_chunk_llama2-7b_all_scores.json   # per-generator + pooled chunk scores
+  cross_chunk_llama2-13b_all_scores.json
+  cross_chunk_llama2-7b_combined_scores.json  # combined chunk scores
+  cross_chunk_llama2-13b_combined_scores.json
 
 docs/metrics_raw.json               # same-model metrics in machine-readable form
 ```
@@ -318,8 +366,9 @@ Same-model total (sequential): ~35 min on a single RTX PRO 6000.
 | Step | 7B detector (5 generators) | 13B detector (5 generators) |
 |------|---------------------------|----------------------------|
 | Token-level feature extraction | ~35 min | ~45 min |
-| Regression + metrics | < 5 sec | < 5 sec |
+| Chunk-level feature extraction | ~30 min | ~35 min |
+| Scoring (per-gen + combined) | < 10 sec | < 10 sec |
 
-Cross-model total (sequential): ~80 min. Each generator's responses are run
-through the detector independently, so the time scales linearly with the
-number of generators.
+Cross-model total (sequential): ~145 min for both token and chunk across both
+detectors. Each generator's responses are run through the detector
+independently, so the time scales linearly with the number of generators.
