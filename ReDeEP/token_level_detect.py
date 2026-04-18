@@ -20,11 +20,11 @@ parser.add_argument(
 args = parser.parse_args()
 if args.dataset == "ragtruth":
     if args.model_name == "llama3-8b":
-        response_path = "../dataset/response_with_llama3_8b.jsonl"
+        response_path = "../dataset/dataset/response_with_llama3_8b.jsonl"
     else:
-        response_path = "../dataset/response.jsonl"
+        response_path = "../dataset/dataset/response.jsonl"
 elif args.dataset == "dolly":
-    response_path = "../dataset/response_dolly.jsonl"
+    response_path = "../dataset/dataset/response_dolly.jsonl"
 
 response = []
 with open(response_path, 'r') as f:
@@ -32,12 +32,9 @@ with open(response_path, 'r') as f:
         data = json.loads(line)
         response.append(data)
 if args.dataset == "ragtruth":
-    if args.model_name == "llama3-8b":
-        source_info_path = "../dataset/source_info.jsonl"
-    else:
-        source_info_path = "../dataset/source_info.jsonl"
+    source_info_path = "../dataset/dataset/source_info.jsonl"
 elif args.dataset == "dolly":
-    source_info_path = "../dataset/source_info_dolly.jsonl"
+    source_info_path = "../dataset/dataset/source_info_dolly.jsonl"
 source_info_dict = {}
 
 with open(source_info_path, 'r') as f:
@@ -48,23 +45,24 @@ with open(source_info_path, 'r') as f:
 
 
 if args.model_name == "llama2-7b":
-    model_name = "llama2/llama-2-7b-chat-hf"
+    model_name = "meta-llama/Llama-2-7b-chat-hf"
 elif args.model_name == "llama2-13b":
-    model_name = "llama2/llama-2-13b-chat-hf"
+    model_name = "meta-llama/Llama-2-13b-chat-hf"
 elif args.model_name == "llama3-8b":
-    model_name = "llama3/Meta-Llama-3-8B-Instruct/"
+    model_name = "meta-llama/Meta-Llama-3-8B-Instruct"
 
 
 model = AutoModelForCausalLM.from_pretrained(
-    f"/home/sunhao_dai/PLMs/{model_name}",
+    model_name,
     device_map="auto",
-    torch_dtype=torch.float16
+    torch_dtype=torch.float16,
+    attn_implementation="eager"
 )
-tokenizer = AutoTokenizer.from_pretrained(f"/home/sunhao_dai/PLMs/{model_name}")
+tokenizer = AutoTokenizer.from_pretrained(model_name)
 device = "cuda"
 
 if args.model_name == "llama2-13b":
-    tokenizer_for_temp = AutoTokenizer.from_pretrained("/home/sunhao_dai/PLMs/llama2/llama-2-7b-chat-hf")
+    tokenizer_for_temp = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
 else:
     tokenizer_for_temp = tokenizer
 
@@ -168,9 +166,9 @@ for i in tqdm(range(len(response))):
         print("all_text_len:", len(input_text))
         print("prompt_len", len(prompt))
         print("respond_len", len(response_rag))
-        input_ids = tokenizer([input_text], return_tensors="pt").input_ids
-        prefix_ids = tokenizer([text], return_tensors="pt").input_ids
-        continue_ids = input_ids[0, prefix_ids.shape[-1]:] # todo 这边要改成幻觉 token 的起止位置
+        input_ids = tokenizer([input_text], return_tensors="pt").input_ids.to(device)
+        prefix_ids = tokenizer([text], return_tensors="pt").input_ids.to(device)
+        continue_ids = input_ids[0, prefix_ids.shape[-1]:]
         if "labels" in response[i].keys():
             hallucination_spans = calculate_hallucination_spans(response[i]['labels'], text, response_rag, tokenizer, prefix_ids.shape[-1])
         else:

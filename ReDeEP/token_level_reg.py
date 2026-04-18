@@ -178,7 +178,19 @@ def calculate_auc_pcc_32_32(df, top_n, top_k, alpha, auc_external_similarity, au
 
     results.update({"Grouped means AUC": auc_difference_normalized})
     results.update({"Grouped means Pearson Correlation": person_difference_normalized})
-    return auc_difference_normalized, person_difference_normalized
+
+    best_f1 = 0
+    best_threshold = 0.5
+    best_recall = 0
+    for t in np.arange(0.01, 1.0, 0.01):
+        preds = (grouped_df['difference_normalized_mean_norm'] >= t).astype(int)
+        f1_val = f1_score(grouped_df['hallucination_label'], preds, zero_division=0)
+        if f1_val > best_f1:
+            best_f1 = f1_val
+            best_threshold = t
+            best_recall = recall_score(grouped_df['hallucination_label'], preds, zero_division=0)
+
+    return auc_difference_normalized, person_difference_normalized, best_recall, best_f1
 
 
 
@@ -220,7 +232,7 @@ if __name__ == "__main__":
         print("model name error")
         exit(-1)
     df = construct_dataframe(data_path, number)
-    auc_external_similarity, auc_parameter_knowledge_difference = calculate_auc_pcc(df.iloc[:, :int(df.shape[1] * 0.5)], number)
+    auc_external_similarity, auc_parameter_knowledge_difference = calculate_auc_pcc(df, number)
     run_all = False
 
     if args.model_name == "llama2-7b":
@@ -243,7 +255,7 @@ if __name__ == "__main__":
     else:
         print("model name error")
         exit(-1)
-    auc_difference_normalized, person_difference_normalized = calculate_auc_pcc_32_32(df, i, j, k, auc_external_similarity, auc_parameter_knowledge_difference, m)
+    auc_difference_normalized, person_difference_normalized, best_recall, best_f1 = calculate_auc_pcc_32_32(df, i, j, k, auc_external_similarity, auc_parameter_knowledge_difference, m)
     if args.model_name == "llama2-7b":
         save_path = "./log/test_llama2_7B/ReDeEP(token).json"
     elif args.model_name == "llama2-13b":
@@ -253,7 +265,7 @@ if __name__ == "__main__":
     else:
         print("model name error")
         exit(-1)
-    result_dict = {"auc":auc_difference_normalized, "pcc": person_difference_normalized}
+    result_dict = {"auc": auc_difference_normalized, "pcc": person_difference_normalized, "recall": best_recall, "f1": best_f1}
     print(result_dict)
     with open(save_path, 'w') as f:
         json.dump(result_dict, f, ensure_ascii=False)
